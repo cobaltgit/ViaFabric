@@ -1,3 +1,20 @@
+/*
+ * This file is part of ViaFabric - https://github.com/ViaVersion/ViaFabric
+ * Copyright (C) 2018-2024 ViaVersion and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package com.viaversion.fabric.common.handler;
 
 import com.viaversion.viaversion.api.Via;
@@ -49,15 +66,15 @@ public class FabricDecodeHandler extends MessageToMessageDecoder<ByteBuf> {
         int decoderIndex = ctx.pipeline().names().indexOf("decompress");
         if (decoderIndex == -1) return;
 
-        if (decoderIndex > ctx.pipeline().names().indexOf("via-decoder")) {
-            ChannelHandler encoder = ctx.pipeline().get("via-encoder");
-            ChannelHandler decoder = ctx.pipeline().get("via-decoder");
+        if (decoderIndex > ctx.pipeline().names().indexOf(CommonTransformer.HANDLER_DECODER_NAME)) {
+            ChannelHandler encoder = ctx.pipeline().get(CommonTransformer.HANDLER_ENCODER_NAME);
+            ChannelHandler decoder = ctx.pipeline().get(CommonTransformer.HANDLER_DECODER_NAME);
 
             ctx.pipeline().remove(encoder);
             ctx.pipeline().remove(decoder);
 
-            ctx.pipeline().addAfter("compress", "via-encoder", encoder);
-            ctx.pipeline().addAfter("decompress", "via-decoder", decoder);
+            ctx.pipeline().addAfter("compress", CommonTransformer.HANDLER_ENCODER_NAME, encoder);
+            ctx.pipeline().addAfter("decompress", CommonTransformer.HANDLER_DECODER_NAME, decoder);
         }
     }
 
@@ -75,7 +92,13 @@ public class FabricDecodeHandler extends MessageToMessageDecoder<ByteBuf> {
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof PipelineReorderEvent) {
+        boolean kryptonReorder = false;
+        switch (evt.toString()) {
+            case "COMPRESSION_THRESHOLD_UPDATED":
+            case "COMPRESSION_ENABLED":
+                kryptonReorder = true;
+        }
+        if (evt instanceof PipelineReorderEvent || kryptonReorder) {
             reorder(ctx);
         }
         super.userEventTriggered(ctx, evt);
